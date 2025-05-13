@@ -1,4 +1,9 @@
 import streamlit as st
+
+# 🔻 This must be FIRST Streamlit command
+st.set_page_config(page_title="Resume Matcher", layout="centered")
+
+# ✅ All other imports and logic can follow
 import joblib
 import pandas as pd
 from PyPDF2 import PdfReader
@@ -10,8 +15,6 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
-# Must go BEFORE any Streamlit rendering
-st.set_page_config(page_title="Resume Matcher", layout="centered")
 
 nltk.download('punkt')
 nltk.download('stopwords')
