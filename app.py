@@ -134,7 +134,7 @@ def extract_skills_edu_exp(resume_text):
     return skills + education +  experience
 
 # Page config
-st.set_page_config(page_title="Multi Resume Analyzer", layout="centered")
+st.set_page_config(page_title="Multi Resume Analyser", layout="centered")
 st.markdown("<h1 style='text-align: center; color: #4CAF50;'>📝 Resume Matching And Candidate Ranking</h1>", unsafe_allow_html=True)
 
 # Initialize session state
