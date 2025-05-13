@@ -10,7 +10,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
-# Page config (must be at top before any other Streamlit commands)
+# Page config (must be at top before any Streamlit code)
 st.set_page_config(
     page_title="Resume Matcher",
     layout="centered",
@@ -26,7 +26,7 @@ nltk.download('wordnet')
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
 
-# Load ML components
+# Load ML models
 model = joblib.load("resume_classification_model.pkl")
 tokenizer = joblib.load("resume_label_encoder.pkl")
 sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -35,39 +35,48 @@ sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
 st.markdown("""
     <style>
         body {
-            color: #ffffff;
-            background-color: #0a192f;
+            background-color: #f9f9f9;
+            color: #333333;
+            font-family: 'Segoe UI', sans-serif;
         }
         .stApp {
-            background-color: #0a192f;
-            color: #ffffff;
-        }
-        .css-18e3th9 {
-            padding-top: 3rem;
-        }
-        h1, h2, h3 {
-            color: #64ffda;
-        }
-        .stButton>button {
-            background-color: #112240;
-            color: #64ffda;
-            border: 1px solid #64ffda;
-        }
-        .stButton>button:hover {
-            background-color: #64ffda;
-            color: #0a192f;
-        }
-        .stDataFrame {
-            background-color: #112240;
+            background-color: #ffffff;
         }
         .block-container {
-            padding: 2rem;
+            padding: 2rem 2rem 1rem 2rem;
+        }
+        h1 {
+            color: #6C63FF;
+            font-weight: 700;
+            text-align: center;
+        }
+        h2, h3 {
+            color: #4A4A4A;
+        }
+        .stButton>button {
+            background-color: #6C63FF;
+            color: white;
+            border-radius: 8px;
+            padding: 0.5em 1em;
+            font-weight: bold;
+            border: none;
+        }
+        .stButton>button:hover {
+            background-color: #7F75FF;
+            color: white;
+        }
+        .stDataFrame {
+            background-color: #f4f4f4;
+            border-radius: 6px;
+        }
+        .stMarkdown {
+            font-size: 1.1rem;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown("<h1 style='text-align: center;'>🧠 Resume Matcher & Candidate Ranking</h1>", unsafe_allow_html=True)
+# --- HEADER ---
+st.markdown("<h1>✨ Resume Matcher & Candidate Ranking</h1>", unsafe_allow_html=True)
 
 # --- SESSION STATE ---
 if "text_blocks" not in st.session_state:
@@ -87,9 +96,9 @@ if "reset_uploader" not in st.session_state:
 
 # --- RESET BUTTON ---
 st.markdown("---")
-cols = st.columns([3, 1, 1])
-with cols[2]:
-    if st.button("🔁 Reset App"):
+cols = st.columns([4, 1])
+with cols[1]:
+    if st.button("🔁 Reset"):
         st.session_state.text_blocks = []
         st.session_state.file_names = []
         st.session_state.processed_files = set()
@@ -97,11 +106,11 @@ with cols[2]:
         st.session_state.reset_uploader += 1
         st.rerun()
 
-# --- INPUT WIDGETS ---
-jd_uploader_key = f"jd_uploader_{st.session_state.reset_uploader}"
-resume_uploader_key = f"resume_uploader_{st.session_state.reset_uploader}"
+# --- UPLOAD INPUTS ---
+jd_key = f"jd_uploader_{st.session_state.reset_uploader}"
+resumes_key = f"resume_uploader_{st.session_state.reset_uploader}"
 
-jd_file = st.file_uploader("📄 Upload Job Description (PDF)", type="pdf", key=jd_uploader_key)
+jd_file = st.file_uploader("📄 Upload Job Description (PDF)", type="pdf", key=jd_key)
 jd = ""
 if jd_file is not None:
     try:
@@ -109,22 +118,22 @@ if jd_file is not None:
         jd_text = "".join([page.extract_text() or "" for page in reader.pages])
         jd = jd_text.strip()
         if jd:
-            st.success("✅ Job Description extracted successfully.")
+            st.success("✅ Job Description extracted.")
         else:
-            st.warning("⚠️ No extractable text found.")
+            st.warning("⚠️ Could not extract text from JD.")
     except Exception as e:
-        st.error(f"❌ Error reading PDF: {e}")
+        st.error(f"❌ Error reading JD PDF: {e}")
 
 uploaded_files = st.file_uploader(
-    "📁 Upload Multiple Resumes (PDF format)",
+    "📁 Upload Resumes (PDF format)",
     type="pdf",
     accept_multiple_files=True,
-    key=resume_uploader_key
+    key=resumes_key
 )
 
-# --- PROCESS UPLOADED RESUMES ---
+# --- PROCESS RESUMES ---
 if uploaded_files and not st.session_state.submitted:
-    st.markdown("### 📑 Extracting Resume Text:")
+    st.markdown("### 🧾 Resume Text Extraction:")
     for uploaded_file in uploaded_files:
         if uploaded_file.name not in st.session_state.processed_files:
             reader = PdfReader(uploaded_file)
@@ -133,74 +142,68 @@ if uploaded_files and not st.session_state.submitted:
                 st.session_state.text_blocks.append(text.strip())
                 st.session_state.file_names.append(uploaded_file.name)
                 st.session_state.processed_files.add(uploaded_file.name)
-                st.success(f"✅ Extracted: {uploaded_file.name}")
+                st.success(f"✔️ {uploaded_file.name} processed.")
 
 # --- SUBMIT BUTTON ---
 if not st.session_state.submitted:
-    if st.button("🚀 Submit"):
-        if len(st.session_state.text_blocks) == 0:
-            st.warning("Please upload at least one valid resume.")
+    if st.button("🚀 Submit for Matching"):
+        if not st.session_state.text_blocks:
+            st.warning("Upload at least one resume.")
         elif not jd.strip():
-            st.warning("Please upload a valid job description.")
+            st.warning("Upload a valid job description.")
         else:
             st.session_state.submitted = True
             st.rerun()
 
-# --- PROCESS AND DISPLAY RESULTS ---
+# --- TEXT CLEANING AND MATCHING ---
 def preprocess_resume(text):
     text = text.lower()
     text = re.sub(r'[^\w\s]|[\d]', '', text)
     tokens = word_tokenize(text)
-    cleaned_tokens = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
-    return ' '.join(cleaned_tokens)
+    cleaned = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
+    return ' '.join(cleaned)
 
 def extract_skills_edu_exp(text):
     keywords = {
-        "skills": {"skills", "skill", "technical skills", "tools", "technologies"},
-        "education": {"bachelor", "master", "phd", "degree", "msc", "university"},
-        "experience": {"experience", "worked", "intern", "company", "organization"}
+        "skills": {"skills", "skill", "tools", "technologies"},
+        "education": {"bachelor", "master", "phd", "msc", "degree", "university"},
+        "experience": {"experience", "worked", "intern", "company"}
     }
     lines = text.split('\n')
-    collected = []
+    output = []
     for line in lines:
         lower = line.strip().lower()
-        if any(kw in lower for kw in keywords["skills"] | keywords["education"] | keywords["experience"]):
-            collected.append(line.strip())
-    return collected
+        if any(k in lower for k in keywords["skills"] | keywords["education"] | keywords["experience"]):
+            output.append(line.strip())
+    return output
 
+# --- RESULTS ---
 if st.session_state.submitted and jd:
-    st.markdown("## ✅ Submission Complete!")
+    st.markdown("## 🎯 Results")
     resumes = st.session_state.text_blocks
     file_names = st.session_state.file_names
 
-    processed_resumes = [extract_skills_edu_exp(preprocess_resume(resume)) for resume in resumes]
-    embeddings = sbert_model.encode(processed_resumes)
+    processed = [extract_skills_edu_exp(preprocess_resume(r)) for r in resumes]
+    embeddings = sbert_model.encode(processed)
     jd_embedding = sbert_model.encode([jd])
     similarities = cosine_similarity(jd_embedding, embeddings)[0]
-    predicted_labels = model.predict(embeddings)
-    predicted_categories = tokenizer.inverse_transform(predicted_labels)
+
+    labels = model.predict(embeddings)
+    categories = tokenizer.inverse_transform(labels)
 
     df = pd.DataFrame({
         "Resume File": file_names,
         "Index": list(range(len(resumes))),
         "Score": similarities,
-        "Predicted Category": predicted_categories
+        "Predicted Category": categories
     })
     df["Rank"] = df["Score"].rank(ascending=False, method='first').astype(int)
-    df = df.sort_values(by="Rank")
+    df = df.sort_values("Rank")
 
-    top_index = df.iloc[0]["Index"]
-    top_pred = model.predict([embeddings[top_index]])[0]
-    top_category = tokenizer.inverse_transform([top_pred])[0]
+    top_idx = df.iloc[0]["Index"]
+    top_cat = tokenizer.inverse_transform([model.predict([embeddings[top_idx]])[0]])[0]
+    st.success(f"🏆 Best Match Predicted Job Category: **{top_cat}**")
 
-    st.success(f"🎯 Best Match Predicted Category: **{top_category}**")
-    st.markdown("### 📊 Ranked Resume Results:")
+    st.markdown("### 📊 Ranked Candidates")
     st.dataframe(df[['Resume File', 'Score', 'Rank', 'Predicted Category']], use_container_width=True)
-
-
-
-    st.markdown("### 📊 Detailed Results")
-    st.dataframe(df[['Resume File', 'Score', 'Rank', 'Predicted Category']], use_container_width=True)
-
-
 
