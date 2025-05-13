@@ -1,5 +1,3 @@
-# Updated Streamlit Resume Matcher with Visual Enhancements (Copy-Paste Ready)
-
 import streamlit as st
 import joblib
 import pandas as pd
@@ -11,40 +9,87 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
-
-# Download NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('punkt_tab')
 
-# Initialize lemmatizer and stopwords
+# --------------------- Custom CSS ---------------------
+custom_css = """
+<style>
+body, .main {
+    background-color: #f0f2f5;
+    color: #050505;
+    font-family: 'Helvetica Neue', sans-serif;
+}
+h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: #1877f2;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+h2, h3 {
+    color: #1c1e21;
+}
+button[kind="primary"], div.stButton > button {
+    background-color: #1877f2 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+}
+div.stButton > button:hover {
+    background-color: #166fe5 !important;
+}
+section[data-testid="stFileUploader"] {
+    background-color: white;
+    border: 1px solid #dfe1e5;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.css-1iyq9l3 {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+}
+.stAlert {
+    border-radius: 6px;
+}
+thead tr th {
+    background-color: #f5f6f7;
+    color: #050505;
+    font-weight: 600;
+}
+tbody tr td {
+    color: #1c1e21;
+}
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
+
+# --------------------- NLP Setup ---------------------
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
-
-# Load models
 model = joblib.load("resume_classification_model.pkl")
 tokenizer = joblib.load("resume_label_encoder.pkl")
 sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Set page config and add custom CSS styling
-st.set_page_config(page_title="Resume Analyser", layout="centered", page_icon="📝")
-st.markdown("""
-    <style>
-    .main { background-color: #f8f9fa; }
-    .css-1d391kg { background-color: #ffffff; border-radius: 12px; padding: 1rem; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); }
-    .stButton>button { background-color: #4CAF50; color: white; border-radius: 6px; padding: 0.5em 1.5em; }
-    .stButton>button:hover { background-color: #45a049; }
-    .stFileUploader { padding: 10px; border-radius: 10px; background-color: #ffffff; }
-    .stDataFrameContainer { padding: 1rem; background: #ffffff; border-radius: 8px; }
-    </style>
-""", unsafe_allow_html=True)
-
-# Header
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Resume Matching & Candidate Ranking System</h1>", unsafe_allow_html=True)
-st.markdown("---")
-
-# Preprocessing
 def preprocess_resume(resume_text):
     text = resume_text.lower()
     text = re.sub(r'[^\w\s]|[\d]', '', text)
@@ -53,15 +98,12 @@ def preprocess_resume(resume_text):
     return ' '.join(cleaned_tokens)
 
 def extract_skills_edu_exp(resume_text):
-    skills_keywords = {
-        "skills", "skill", "technical skills", "soft skills", "tools", "technologies",
-        "frameworks", "languages", "certifications", "programming", "databases", "cloud"
-    }
+    skills_keywords = {"skills", "tools", "technologies", "programming", "databases", "cloud", "analytics", "networking"}
     education_keywords = {
-        "bachelor", "masters", "phd", "degree", "university", "college", "b.tech", "mba",
-        "m.tech", "mca", "bca", "bsc", "msc", "law", "engineering"
+        "bachelor", "master", "phd", "degree", "university", "college", "b.tech", "mba", "mca", "pgdm", "engineering",
+        "computer science", "business", "law", "arts", "healthcare", "marketing", "finance", "project management"
     }
-    work_keywords = {"experience", "worked", "employed", "company", "intern", "internship"}
+    work_keywords = {"experience", "worked", "employed", "intern", "company", "organization"}
 
     skills_pattern = re.compile(r'\b(' + '|'.join(skills_keywords) + r')\b', re.IGNORECASE)
     edu_pattern = re.compile(r'\b(' + '|'.join(education_keywords) + r')\b', re.IGNORECASE)
@@ -69,28 +111,28 @@ def extract_skills_edu_exp(resume_text):
 
     skills, education, experience = [], [], []
     lines = resume_text.split('\n')
-
     for line in lines:
-        sentence = line.strip()
-        lower = sentence.lower()
+        lower = line.strip().lower()
         if skills_pattern.search(lower):
-            skills.append(sentence)
+            skills.append(line.strip())
         if edu_pattern.search(lower):
-            education.append(sentence)
+            education.append(line.strip())
         if work_pattern.search(lower):
-            experience.append(sentence)
-
+            experience.append(line.strip())
     return skills + education + experience
 
-# Session state
-if "text_blocks" not in st.session_state: st.session_state.text_blocks = []
-if "file_names" not in st.session_state: st.session_state.file_names = []
-if "processed_files" not in st.session_state: st.session_state.processed_files = set()
-if "submitted" not in st.session_state: st.session_state.submitted = False
-if "reset_uploader" not in st.session_state: st.session_state.reset_uploader = 0
+# --------------------- Streamlit UI ---------------------
+st.set_page_config(page_title="Resume Matcher", layout="centered")
+st.markdown("<h1>📝 Resume Matching and Candidate Ranking</h1>", unsafe_allow_html=True)
 
-# Reset
-with st.sidebar:
+# Session State
+for key in ["text_blocks", "file_names", "processed_files", "submitted", "reset_uploader"]:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key in ["text_blocks", "file_names"] else set() if key == "processed_files" else False if key == "submitted" else 0
+
+# Reset Button
+col1, col2, col3 = st.columns(3)
+with col3:
     if st.button("🔁 Reset Application"):
         st.session_state.text_blocks = []
         st.session_state.file_names = []
@@ -100,65 +142,50 @@ with st.sidebar:
         st.rerun()
 
 # Upload Job Description
-jd_uploader_key = f"jd_uploader_{st.session_state.reset_uploader}"
-jd_file = st.file_uploader("📄 Upload Job Description (PDF)", type="pdf", key=jd_uploader_key)
+jd_key = f"jd_uploader_{st.session_state.reset_uploader}"
+resume_key = f"resume_uploader_{st.session_state.reset_uploader}"
+
+jd_file = st.file_uploader("📄 Upload Job Description (PDF)", type="pdf", key=jd_key)
 jd = ""
-if jd_file:
+if jd_file is not None:
     try:
         reader = PdfReader(jd_file)
-        jd_text = ""
-        for page in reader.pages:
-            text = page.extract_text()
-            if text: jd_text += text + "\n"
-        jd = jd_text.strip()
-        if jd:
-            st.success("✅ Job Description extracted successfully.")
-        else:
-            st.warning("⚠️ No extractable text found.")
+        jd = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+        st.success("✅ Job Description extracted successfully." if jd else "⚠️ No extractable text found.")
     except Exception as e:
-        st.error(f"❌ Error reading JD PDF: {e}")
+        st.error(f"❌ Error reading PDF: {e}")
 
 # Upload Resumes
-resume_uploader_key = f"resume_uploader_{st.session_state.reset_uploader}"
-uploaded_files = st.file_uploader(
-    "📑 Upload Resumes (PDF format)", type="pdf", accept_multiple_files=True, key=resume_uploader_key
-)
-
+uploaded_files = st.file_uploader("📑 Upload Multiple Resumes (PDF format)", type="pdf", accept_multiple_files=True, key=resume_key)
 if uploaded_files and not st.session_state.submitted:
-    st.markdown("### 📄 Resume Extraction:")
-    for uploaded_file in uploaded_files:
-        if uploaded_file.name not in st.session_state.processed_files:
-            reader = PdfReader(uploaded_file)
-            text = ""
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-            if text.strip():
-                st.session_state.text_blocks.append(text.strip())
-                st.session_state.file_names.append(uploaded_file.name)
-                st.session_state.processed_files.add(uploaded_file.name)
-                st.success(f"✅ Extracted from: {uploaded_file.name}")
+    st.markdown("### 📄 Extracted Resume Texts:")
+    for file in uploaded_files:
+        if file.name not in st.session_state.processed_files:
+            reader = PdfReader(file)
+            text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+            if text:
+                st.session_state.text_blocks.append(text)
+                st.session_state.file_names.append(file.name)
+                st.session_state.processed_files.add(file.name)
+                st.success(f"✅ Extracted: {file.name}")
 
 # Submit
-if not st.session_state.submitted and st.button("🚀 Submit for Analysis"):
-    if not st.session_state.text_blocks:
-        st.warning("⚠️ Please upload at least one resume.")
-    elif not jd.strip():
-        st.warning("⚠️ Please upload a job description.")
-    else:
-        st.session_state.submitted = True
-        st.rerun()
+if not st.session_state.submitted:
+    if st.button("🚀 Submit"):
+        if not st.session_state.text_blocks:
+            st.warning("⚠️ Please upload at least one valid resume.")
+        elif not jd:
+            st.warning("⚠️ Please upload a job description.")
+        else:
+            st.session_state.submitted = True
+            st.rerun()
 
 # Results
 if st.session_state.submitted and jd:
-    st.markdown("## 🎯 Matching Results")
-
+    st.markdown("## ✅ Submission Complete!")
     resumes = st.session_state.text_blocks
-    file_names = st.session_state.file_names
-    processed_resumes = [
-        extract_skills_edu_exp(preprocess_resume(r)) for r in resumes
-    ]
+    processed_resumes = [extract_skills_edu_exp(preprocess_resume(r)) for r in resumes]
+
     embeddings = sbert_model.encode(processed_resumes)
     jd_embedding = sbert_model.encode([jd])
     similarities = cosine_similarity(jd_embedding, embeddings)[0]
@@ -167,18 +194,22 @@ if st.session_state.submitted and jd:
     predicted_categories = tokenizer.inverse_transform(predicted_labels)
 
     df = pd.DataFrame({
-        "Resume File": file_names,
+        "Resume File": st.session_state.file_names,
         "Index": list(range(len(resumes))),
         "Score": similarities,
         "Predicted Category": predicted_categories
     })
+
     df["Rank"] = df["Score"].rank(ascending=False, method='first').astype(int)
     df = df.sort_values(by="Rank")
 
     top_resume_embedding = embeddings[df.iloc[0]["Index"]].reshape(1, -1)
-    top_pred = model.predict(top_resume_embedding)
-    top_category = tokenizer.inverse_transform(top_pred)[0]
-    st.success(f"🏆 Best Match Predicted Category: **{top_category}**")
+    top_category = tokenizer.inverse_transform(model.predict(top_resume_embedding))[0]
+    st.success(f"🎯 Predicted Job Category for Best Match: **{top_category}**")
+
+    st.markdown("### 📊 Resume Analysis Results:")
+    st.dataframe(df[['Resume File', 'Score', 'Rank', 'Predicted Category']], width=700)
+
 
     st.markdown("### 📊 Detailed Results")
     st.dataframe(df[['Resume File', 'Score', 'Rank', 'Predicted Category']], use_container_width=True)
