@@ -9,10 +9,17 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+
+# Must go BEFORE any Streamlit rendering
+st.set_page_config(page_title="Resume Matcher", layout="centered")
+
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('punkt_tab')
+
+# Now CSS injection and Streamlit UI commands can safely follow
+
 
 # --------------------- Custom CSS ---------------------
 custom_css = """
